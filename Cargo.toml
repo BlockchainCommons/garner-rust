@@ -1,0 +1,49 @@
+[package]
+name = "garner"
+version = "0.1.0"
+edition = "2024"
+description = "A Tor onion service that serves static files over HTTP, built with Arti."
+authors = ["Blockchain Commons"]
+repository = "https://github.com/BlockchainCommons/garner"
+readme = "README.md"
+license = "BSD-2-Clause-Patent"
+keywords = ["tor", "onion", "arti", "hidden-service", "privacy"]
+categories = [
+    "network-programming",
+    "command-line-utilities",
+]
+
+[[bin]]
+name = "garner"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "^1.0.0"
+futures-util = "^0.3"
+tokio = { version = "^1", features = ["macros", "rt-multi-thread", "fs", "time"] }
+
+# Arti / onion service pieces
+arti-client = { version = "0.38", features = [
+    "tokio",
+    "native-tls",
+    "onion-service-service",
+    "onion-service-client",
+    "experimental-api",
+] }
+clap = { version = "^4.4.3", features = ["derive", "env"] }
+tor-hsservice = "0.38"
+tor-cell = "0.38"
+tor-proto = "0.38.0"
+
+# UR-encoded Ed25519 key support
+bc-components = { version = "0.31", features = ["ed25519"] }
+bc-ur = "0.19"
+dcbor = "0.25"
+tor-hscrypto = "0.38"
+tor-llcrypto = "0.38"
+
+# Utilities
+chrono = "0.4"
+indicatif = "0.18.3"
+mime_guess = "^2"
+safelog = "0.7.1"
