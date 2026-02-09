@@ -1,9 +1,18 @@
 use anyhow::{anyhow, Context, Result};
-use bc_components::{PrivateKeys, PublicKeys, SigningPrivateKey, SigningPublicKey};
-use bc_ur::URDecodable;
+use bc_components::{Ed25519PrivateKey, Ed25519PublicKey, PrivateKeys, PublicKeys, SigningPrivateKey, SigningPublicKey};
+use bc_ur::{URDecodable, UREncodable};
 use safelog::DisplayRedacted as _;
 use tor_hscrypto::pk::{HsId, HsIdKeypair};
 use tor_llcrypto::pk::ed25519::{ExpandedKeypair, Keypair};
+
+/// Convert an [`HsId`] (the raw Ed25519 public key bytes of a Tor onion
+/// service) into a `ur:signing-public-key/…` UR string.
+pub fn public_key_ur_from_hsid(hs_id: &HsId) -> Result<String> {
+    let bytes: &[u8; 32] = hs_id.as_ref();
+    let ed_pub = Ed25519PublicKey::from_data(*bytes);
+    let signing_pub = SigningPublicKey::from_ed25519(ed_pub);
+    Ok(signing_pub.ur_string())
+}
 
 /// Extract the Ed25519 signing key from either a `ur:crypto-prvkeys`
 /// (combined key bundle) or a `ur:signing-private-key` UR string.
@@ -70,6 +79,16 @@ pub fn parse_public_key_to_onion_host(ur: &str) -> Result<String> {
     Ok(hs_id.display_unredacted().to_string())
 }
 
+/// Generate a random Ed25519 keypair and return the private and public key
+/// UR strings.
+pub fn generate_keypair() -> Result<(String, String)> {
+    let ed_priv = Ed25519PrivateKey::new();
+    let ed_pub = ed_priv.public_key();
+    let signing_priv = SigningPrivateKey::new_ed25519(ed_priv);
+    let signing_pub = SigningPublicKey::from_ed25519(ed_pub);
+    Ok((signing_priv.ur_string(), signing_pub.ur_string()))
+}
+
 /// Derive the `.onion` hostname from an [`HsIdKeypair`].
 #[cfg(test)]
 fn onion_host_from_keypair(keypair: &HsIdKeypair) -> String {
@@ -80,9 +99,7 @@ fn onion_host_from_keypair(keypair: &HsIdKeypair) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bc_components::{
-        Ed25519PrivateKey, EncapsulationPrivateKey, X25519PrivateKey,
-    };
+    use bc_components::{EncapsulationPrivateKey, X25519PrivateKey};
     use bc_ur::UREncodable;
     use std::sync::Once;
 
@@ -210,6 +227,58 @@ mod tests {
             onion_host_from_keypair(&kp2),
             "both UR formats must produce the same .onion address"
         );
+    }
+
+    // --- public_key_ur_from_hsid ---
+
+    #[test]
+    fn test_public_key_ur_from_hsid() {
+        init();
+
+        // Derive an Ed25519 public key from the known seed
+        let ed_priv = Ed25519PrivateKey::from_data(KNOWN_SEED);
+        let ed_pub = ed_priv.public_key();
+        let pubkey_bytes: [u8; 32] = *ed_pub.data();
+
+        // Create an HsId from those bytes and convert to UR
+        let hs_id = HsId::from(pubkey_bytes);
+        let ur = public_key_ur_from_hsid(&hs_id).expect("should produce UR");
+        assert!(
+            ur.starts_with("ur:signing-public-key/"),
+            "expected ur:signing-public-key prefix: {ur}"
+        );
+
+        // Round-trip: parsing the UR back should yield the same .onion address
+        let onion = parse_public_key_to_onion_host(&ur)
+            .expect("should parse UR back to onion host");
+        assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
+
+        // Cross-check: the direct HsId display must match
+        let expected_onion = hs_id.display_unredacted().to_string();
+        assert_eq!(onion, expected_onion, "round-trip onion address must match");
+    }
+
+    // --- generate_keypair ---
+
+    #[test]
+    fn test_generate_keypair() {
+        init();
+        let (priv_ur, pub_ur) = generate_keypair().expect("should generate keypair");
+        assert!(
+            priv_ur.starts_with("ur:signing-private-key/"),
+            "expected ur:signing-private-key prefix: {priv_ur}"
+        );
+        assert!(
+            pub_ur.starts_with("ur:signing-public-key/"),
+            "expected ur:signing-public-key prefix: {pub_ur}"
+        );
+        // Round-trip: private key should parse successfully
+        let _keypair = parse_private_key(&priv_ur).expect("should parse generated private key");
+        // Round-trip: public key should produce a valid .onion address
+        let onion = parse_public_key_to_onion_host(&pub_ur)
+            .expect("should parse generated public key");
+        assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
+        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
     }
 
     // --- Error cases ---

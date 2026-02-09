@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
@@ -10,7 +9,7 @@ use crate::ui;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(120);
 
-pub async fn run(url: &str, key: Option<&str>) -> Result<()> {
+pub async fn run(urls: &[String], key: Option<&str>, address: Option<&str>) -> Result<()> {
     let interactive = ui::is_interactive();
 
     // Set up spinner (interactive only)
@@ -30,34 +29,72 @@ pub async fn run(url: &str, key: Option<&str>) -> Result<()> {
 
     let updater = bar.as_ref().map(ui::spawn_elapsed_updater);
 
-    // When a public key is provided, derive the .onion host from it
-    // and treat `url` as a path-only argument.
-    let resolved_url;
-    let fetch_url = if let Some(key_ur) = key {
-        let onion_host = crate::key::parse_public_key_to_onion_host(key_ur)?;
-        let path = if url.starts_with('/') { url } else { &format!("/{url}") };
-        resolved_url = format!("{onion_host}{path}");
-        &resolved_url
+    // Resolve the .onion host when --key or --address is provided.
+    let onion_host: Option<String> = if let Some(key_ur) = key {
+        Some(crate::key::parse_public_key_to_onion_host(key_ur)?)
+    } else if let Some(addr) = address {
+        let host = addr.strip_prefix("http://").unwrap_or(addr);
+        let host = host.strip_suffix('/').unwrap_or(host);
+        Some(host.to_string())
     } else {
-        url
+        None
     };
 
-    let result = do_fetch(fetch_url, bar.as_ref()).await;
+    // Build full URLs from paths (when host is known) or use as-is.
+    let resolved: Vec<String> = urls
+        .iter()
+        .map(|u| {
+            if let Some(ref host) = onion_host {
+                let path = if u.starts_with('/') { u.clone() } else { format!("/{u}") };
+                format!("{host}{path}")
+            } else {
+                u.clone()
+            }
+        })
+        .collect();
+
+    // Bootstrap Tor once, then fetch each URL.
+    // Ephemeral state dir avoids lock contention with concurrent
+    // invocations.  Declared before `tor` so it drops (and is deleted)
+    // after the TorClient releases its locks.
+    let (state_dir, cache_dir) = crate::tor_dirs()?;
+    let mut builder = crate::tor_config(state_dir.path(), &cache_dir);
+    builder
+        .stream_timeouts()
+        .connect_timeout(CONNECT_TIMEOUT);
+    let config = builder.build()?;
+    let tor = TorClient::create_bootstrapped(config).await?;
+
+    let mut bodies: Vec<Vec<u8>> = Vec::with_capacity(resolved.len());
+    for url in &resolved {
+        bodies.push(fetch_url(&tor, url, bar.as_ref()).await?);
+    }
 
     // Clean up spinner *before* writing to stdout so finish_and_clear
     // doesn't erase the output line.
     if let Some(ref h) = updater { h.abort(); }
     if let Some(ref bar) = bar { bar.finish_and_clear(); }
 
-    let body = result?;
-
     use std::io::Write;
-    std::io::stdout().write_all(&body)?;
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    for (i, body) in bodies.iter().enumerate() {
+        if i > 0 {
+            out.write_all(b"\n")?;
+        }
+        out.write_all(body)?;
+    }
 
     Ok(())
 }
 
-async fn do_fetch(url: &str, bar: Option<&ProgressBar>) -> Result<Vec<u8>> {
+/// Connect to an onion service and fetch a single URL, reusing an
+/// already-bootstrapped Tor client.
+async fn fetch_url<R: tor_rtcompat::Runtime>(
+    tor: &TorClient<R>,
+    url: &str,
+    bar: Option<&ProgressBar>,
+) -> Result<Vec<u8>> {
     // Parse the URL to extract host and path
     let url = url.strip_prefix("http://").unwrap_or(url);
     let (host, path) = match url.find('/') {
@@ -70,22 +107,6 @@ async fn do_fetch(url: &str, bar: Option<&ProgressBar>) -> Result<Vec<u8>> {
             "expected a .onion address, got: {host}"
         ));
     }
-
-    // Use a separate state directory so the client doesn't interfere
-    // with a concurrently running garner server instance.
-    let data_dir = dirs();
-    let mut builder =
-        arti_client::config::TorClientConfigBuilder::from_directories(
-            data_dir.join("state"),
-            data_dir.join("cache"),
-        );
-    builder
-        .stream_timeouts()
-        .connect_timeout(CONNECT_TIMEOUT);
-    let config = builder.build()?;
-
-    // Bootstrap Tor client
-    let tor = TorClient::create_bootstrapped(config).await?;
 
     // Switch to connect phase
     if let Some(bar) = bar {
@@ -169,27 +190,3 @@ async fn do_fetch(url: &str, bar: Option<&ProgressBar>) -> Result<Vec<u8>> {
     Ok(response[body_start..].to_vec())
 }
 
-fn dirs() -> PathBuf {
-    if let Some(data) = dirs_data_dir() {
-        data.join("garner-client")
-    } else {
-        PathBuf::from(".garner-client")
-    }
-}
-
-fn dirs_data_dir() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    {
-        std::env::var_os("HOME")
-            .map(|h| PathBuf::from(h).join("Library/Application Support"))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("HOME")
-                    .map(|h| PathBuf::from(h).join(".local/share"))
-            })
-    }
-}
