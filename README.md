@@ -179,6 +179,21 @@ Fetch one or more documents from a `.onion` address over Tor.
 | `--key <UR>`       | Ed25519 public key in UR format to derive the `.onion` host. Also reads `GARNER_KEY` env var. |
 | `--address <ADDR>` | `.onion` address to connect to directly. Also reads `GARNER_ADDRESS` env var.                 |
 
+## Version History
+
+### 0.1.0 - February 11, 2026
+
+- Tor onion service server (`garner server`) that serves static files from a configurable docroot over HTTP.
+- Tor client (`garner get`) that fetches documents from .onion URLs with 120s connect timeout and END MISC workaround.
+- Ed25519 keypair generation (`garner generate keypair`) for deterministic .onion addresses.
+- UR-encoded key support: accepts `ur:signing-private-key`, `ur:signing-public-key`, `ur:crypto-prvkeys`, and `ur:crypto-pubkeys` formats.
+- Deterministic onion addresses via `--key` flag (server) or `--key`/`--address` flags (get).
+- Ephemeral in-memory Arti keystore with per-invocation temp state dirs for concurrent operation.
+- Interactive terminal UI with spinners and elapsed-time counters; structured log output for non-interactive use.
+- Common Log Format request logging for served requests.
+- Path traversal protection and MIME type detection for served files.
+- Fallback from `index.html` to `index.txt` for root path requests.
+
 ## Status - Community Review
 
 Garner is currently in community review. We appreciate your testing and feedback. Comments can be posted [to the Gordian Developer Community](https://github.com/BlockchainCommons/Gordian-Developer-Community/discussions).
