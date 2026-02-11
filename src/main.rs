@@ -61,16 +61,13 @@ fn tor_config(
 ) -> arti_client::config::TorClientConfigBuilder {
     let mut builder =
         arti_client::config::TorClientConfigBuilder::from_directories(
-            state_dir,
-            cache_dir,
+            state_dir, cache_dir,
         );
-    builder
-        .storage()
-        .keystore()
-        .primary()
-        .kind(tor_config::ExplicitOrAuto::Explicit(
+    builder.storage().keystore().primary().kind(
+        tor_config::ExplicitOrAuto::Explicit(
             tor_keymgr::config::ArtiKeystoreKind::Ephemeral,
-        ));
+        ),
+    );
     builder
 }
 
@@ -115,7 +112,9 @@ async fn main() {
     bc_components::register_tags();
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Server { key, docroot } => server::run(key.as_deref(), &docroot).await,
+        Commands::Server { key, docroot } => {
+            server::run(key.as_deref(), &docroot).await
+        }
         Commands::Get { urls, key, address } => {
             get::run(&urls, key.as_deref(), address.as_deref()).await
         }

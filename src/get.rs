@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arti_client::TorClient;
 use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -9,7 +9,11 @@ use crate::ui;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(120);
 
-pub async fn run(urls: &[String], key: Option<&str>, address: Option<&str>) -> Result<()> {
+pub async fn run(
+    urls: &[String],
+    key: Option<&str>,
+    address: Option<&str>,
+) -> Result<()> {
     let interactive = ui::is_interactive();
 
     // Set up spinner (interactive only)
@@ -45,7 +49,11 @@ pub async fn run(urls: &[String], key: Option<&str>, address: Option<&str>) -> R
         .iter()
         .map(|u| {
             if let Some(ref host) = onion_host {
-                let path = if u.starts_with('/') { u.clone() } else { format!("/{u}") };
+                let path = if u.starts_with('/') {
+                    u.clone()
+                } else {
+                    format!("/{u}")
+                };
                 format!("{host}{path}")
             } else {
                 u.clone()
@@ -59,9 +67,7 @@ pub async fn run(urls: &[String], key: Option<&str>, address: Option<&str>) -> R
     // after the TorClient releases its locks.
     let (state_dir, cache_dir) = crate::tor_dirs()?;
     let mut builder = crate::tor_config(state_dir.path(), &cache_dir);
-    builder
-        .stream_timeouts()
-        .connect_timeout(CONNECT_TIMEOUT);
+    builder.stream_timeouts().connect_timeout(CONNECT_TIMEOUT);
     let config = builder.build()?;
     let tor = TorClient::create_bootstrapped(config).await?;
 
@@ -72,8 +78,12 @@ pub async fn run(urls: &[String], key: Option<&str>, address: Option<&str>) -> R
 
     // Clean up spinner *before* writing to stdout so finish_and_clear
     // doesn't erase the output line.
-    if let Some(ref h) = updater { h.abort(); }
-    if let Some(ref bar) = bar { bar.finish_and_clear(); }
+    if let Some(ref h) = updater {
+        h.abort();
+    }
+    if let Some(ref bar) = bar {
+        bar.finish_and_clear();
+    }
 
     use std::io::Write;
     let stdout = std::io::stdout();
@@ -103,9 +113,7 @@ async fn fetch_url<R: tor_rtcompat::Runtime>(
     };
 
     if !host.ends_with(".onion") {
-        return Err(anyhow!(
-            "expected a .onion address, got: {host}"
-        ));
+        return Err(anyhow!("expected a .onion address, got: {host}"));
     }
 
     // Switch to connect phase
@@ -148,13 +156,9 @@ async fn fetch_url<R: tor_rtcompat::Runtime>(
     // specific error when data has already been received.
     let mut response = Vec::new();
     if let Err(e) = stream.read_to_end(&mut response).await {
-        let is_end_misc = e
-            .to_string()
-            .contains("END cell with reason MISC");
+        let is_end_misc = e.to_string().contains("END cell with reason MISC");
         if !is_end_misc || response.is_empty() {
-            return Err(
-                anyhow!(e).context("reading response")
-            );
+            return Err(anyhow!(e).context("reading response"));
         }
     }
 
@@ -169,9 +173,7 @@ async fn fetch_url<R: tor_rtcompat::Runtime>(
     let status_code: u16 = status_line
         .split_whitespace()
         .nth(1)
-        .ok_or_else(|| {
-            anyhow!("malformed status line: {status_line}")
-        })?
+        .ok_or_else(|| anyhow!("malformed status line: {status_line}"))?
         .parse()
         .context("parsing status code")?;
 
@@ -189,4 +191,3 @@ async fn fetch_url<R: tor_rtcompat::Runtime>(
     let body_start = header_end + 4;
     Ok(response[body_start..].to_vec())
 }
-

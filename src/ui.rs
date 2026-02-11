@@ -1,14 +1,14 @@
-use std::io::IsTerminal;
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::{
+    io::IsTerminal,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use chrono::Utc;
 use indicatif::ProgressBar;
 
 /// Check if stderr is connected to an interactive terminal.
-pub fn is_interactive() -> bool {
-    std::io::stderr().is_terminal()
-}
+pub fn is_interactive() -> bool { std::io::stderr().is_terminal() }
 
 /// Format a timestamp in Common Log Format: `DD/Mon/YYYY:HH:MM:SS +0000`.
 pub fn clf_timestamp() -> String {
@@ -17,7 +17,11 @@ pub fn clf_timestamp() -> String {
 
 /// Print a timestamped log message to stderr.
 pub fn log(message: &str) {
-    eprintln!("[{}] {}", Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"), message);
+    eprintln!(
+        "[{}] {}",
+        Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+        message
+    );
 }
 
 /// Return the platform-specific application data directory for garner

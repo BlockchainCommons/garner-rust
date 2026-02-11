@@ -1,15 +1,19 @@
-use std::{path::{Path, PathBuf}, sync::Arc, time::Instant};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use anyhow::{anyhow, Context, Result};
-use arti_client::config::onion_service::OnionServiceConfigBuilder;
-use arti_client::TorClient;
+use anyhow::{Context, Result, anyhow};
+use arti_client::{
+    TorClient, config::onion_service::OnionServiceConfigBuilder,
+};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use mime_guess::MimeGuess;
 use safelog::DisplayRedacted as _;
-use std::time::Duration;
 use tor_cell::relaycell::msg::{Connected, End};
-use tor_hsservice::{handle_rend_requests, status::State, StreamRequest};
+use tor_hsservice::{StreamRequest, handle_rend_requests, status::State};
 use tor_proto::client::stream::IncomingStreamRequest;
 
 use crate::ui;
@@ -51,8 +55,12 @@ pub async fn run(key: Option<&str>, docroot: &str) -> Result<()> {
         TorClient::create_bootstrapped(config)
             .await
             .inspect_err(|_| {
-                if let Some(ref h) = updater { h.abort(); }
-                if let Some(ref bar) = bar { bar.finish_and_clear(); }
+                if let Some(ref h) = updater {
+                    h.abort();
+                }
+                if let Some(ref bar) = bar {
+                    bar.finish_and_clear();
+                }
             })?;
 
     // 2) Configure + launch onion service
@@ -80,21 +88,27 @@ pub async fn run(key: Option<&str>, docroot: &str) -> Result<()> {
     };
 
     let Some((svc, rend_requests)) = launch_result else {
-        if let Some(ref h) = updater { h.abort(); }
-        if let Some(ref bar) = bar { bar.finish_and_clear(); }
+        if let Some(ref h) = updater {
+            h.abort();
+        }
+        if let Some(ref bar) = bar {
+            bar.finish_and_clear();
+        }
         return Err(anyhow!(
             "Onion service is disabled in config \
              (launch_onion_service returned None)"
         ));
     };
 
-    let onion = svc
-        .onion_address()
-        .ok_or_else(|| {
-            if let Some(ref h) = updater { h.abort(); }
-            if let Some(ref bar) = bar { bar.finish_and_clear(); }
-            anyhow!("Couldn't determine onion address (missing key?)")
-        })?;
+    let onion = svc.onion_address().ok_or_else(|| {
+        if let Some(ref h) = updater {
+            h.abort();
+        }
+        if let Some(ref bar) = bar {
+            bar.finish_and_clear();
+        }
+        anyhow!("Couldn't determine onion address (missing key?)")
+    })?;
     let onion_host = onion.display_unredacted().to_string();
     let pub_ur = crate::key::public_key_ur_from_hsid(&onion)?;
 
@@ -122,15 +136,17 @@ pub async fn run(key: Option<&str>, docroot: &str) -> Result<()> {
         match state {
             State::Running | State::DegradedReachable => break,
             State::Broken => {
-                if let Some(ref h) = updater { h.abort(); }
-                if let Some(ref bar) = bar { bar.finish_and_clear(); }
+                if let Some(ref h) = updater {
+                    h.abort();
+                }
+                if let Some(ref bar) = bar {
+                    bar.finish_and_clear();
+                }
                 let problem = status
                     .current_problem()
                     .map(|p| format!("{p:?}"))
                     .unwrap_or_else(|| "unknown".into());
-                return Err(anyhow!(
-                    "Onion service failed: {problem}"
-                ));
+                return Err(anyhow!("Onion service failed: {problem}"));
             }
             _ => {}
         }
@@ -138,7 +154,9 @@ pub async fn run(key: Option<&str>, docroot: &str) -> Result<()> {
 
     // Bootup complete
     let elapsed = start.elapsed().as_secs();
-    if let Some(ref h) = updater { h.abort(); }
+    if let Some(ref h) = updater {
+        h.abort();
+    }
     if let Some(ref bar) = bar {
         bar.finish_and_clear();
         eprintln!("\u{2713} Server started in {elapsed}s");
@@ -170,8 +188,13 @@ pub async fn run(key: Option<&str>, docroot: &str) -> Result<()> {
         let docroot = Arc::clone(&docroot);
         let serve_bar = serve_bar.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                handle_stream_request(req, &docroot, serve_bar.as_ref(), interactive).await
+            if let Err(e) = handle_stream_request(
+                req,
+                &docroot,
+                serve_bar.as_ref(),
+                interactive,
+            )
+            .await
             {
                 if let Some(ref bar) = serve_bar {
                     bar.println(format!("  stream error: {e:#}"));
@@ -199,8 +222,7 @@ async fn handle_stream_request(
     // Accept -> DataStream
     let mut stream = req.accept(Connected::new_empty()).await?;
 
-    let (method, path) =
-        read_http_request_line(&mut stream).await?;
+    let (method, path) = read_http_request_line(&mut stream).await?;
 
     let (status, body_len) = if method != "GET" {
         write_http_response(
@@ -216,19 +238,12 @@ async fn handle_stream_request(
             .await
             .with_context(|| format!("reading {file_path:?}"))?;
         let len = body.len();
-        let mime =
-            MimeGuess::from_path(&file_path).first_or_octet_stream();
-        write_http_response(&mut stream, 200, mime.as_ref(), &body)
-            .await?;
+        let mime = MimeGuess::from_path(&file_path).first_or_octet_stream();
+        write_http_response(&mut stream, 200, mime.as_ref(), &body).await?;
         (200, len)
     } else {
-        write_http_response(
-            &mut stream,
-            404,
-            "text/plain",
-            b"Not Found",
-        )
-        .await?;
+        write_http_response(&mut stream, 404, "text/plain", b"Not Found")
+            .await?;
         (404, 9usize)
     };
 
@@ -280,8 +295,8 @@ async fn read_http_request_line(
 
     let mut buf = vec![0u8; 8192];
     let n = stream.read(&mut buf).await?;
-    let s = std::str::from_utf8(&buf[..n])
-        .context("request not valid UTF-8")?;
+    let s =
+        std::str::from_utf8(&buf[..n]).context("request not valid UTF-8")?;
 
     let first_line =
         s.lines().next().ok_or_else(|| anyhow!("empty request"))?;

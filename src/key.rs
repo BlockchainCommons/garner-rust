@@ -1,5 +1,8 @@
-use anyhow::{anyhow, Context, Result};
-use bc_components::{Ed25519PrivateKey, Ed25519PublicKey, PrivateKeys, PublicKeys, SigningPrivateKey, SigningPublicKey};
+use anyhow::{Context, Result, anyhow};
+use bc_components::{
+    Ed25519PrivateKey, Ed25519PublicKey, PrivateKeys, PublicKeys,
+    SigningPrivateKey, SigningPublicKey,
+};
 use bc_ur::{URDecodable, UREncodable};
 use safelog::DisplayRedacted as _;
 use tor_hscrypto::pk::{HsId, HsIdKeypair};
@@ -98,10 +101,12 @@ fn onion_host_from_keypair(keypair: &HsIdKeypair) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Once;
+
     use bc_components::{EncapsulationPrivateKey, X25519PrivateKey};
     use bc_ur::UREncodable;
-    use std::sync::Once;
+
+    use super::*;
 
     static INIT: Once = Once::new();
 
@@ -112,9 +117,8 @@ mod tests {
     }
 
     const KNOWN_SEED: [u8; 32] = [
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
-        0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+        0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
         0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
     ];
 
@@ -148,7 +152,10 @@ mod tests {
         let signing_key = SigningPrivateKey::new_ed25519(ed_key);
         let enc_key = EncapsulationPrivateKey::X25519(X25519PrivateKey::new());
         let bundle = PrivateKeys::with_keys(signing_key, enc_key);
-        bundle.public_keys().expect("derive public keys").ur_string()
+        bundle
+            .public_keys()
+            .expect("derive public keys")
+            .ur_string()
     }
 
     // --- Tests for ur:signing-private-key / ur:signing-public-key ---
@@ -160,16 +167,25 @@ mod tests {
         let keypair = parse_private_key(&ur).expect("should parse private key");
         let onion = onion_host_from_keypair(&keypair);
         assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
-        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
+        assert_eq!(
+            onion.len(),
+            62,
+            "expected 56 base32 chars + '.onion': {onion}"
+        );
     }
 
     #[test]
     fn test_parse_signing_public_key_to_onion_host() {
         init();
         let ur = make_ur_signing_public_key();
-        let onion = parse_public_key_to_onion_host(&ur).expect("should parse public key");
+        let onion = parse_public_key_to_onion_host(&ur)
+            .expect("should parse public key");
         assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
-        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
+        assert_eq!(
+            onion.len(),
+            62,
+            "expected 56 base32 chars + '.onion': {onion}"
+        );
     }
 
     #[test]
@@ -178,7 +194,8 @@ mod tests {
         let priv_ur = make_ur_signing_private_key();
         let pub_ur = make_ur_signing_public_key();
 
-        let keypair = parse_private_key(&priv_ur).expect("should parse private key");
+        let keypair =
+            parse_private_key(&priv_ur).expect("should parse private key");
         let onion_from_priv = onion_host_from_keypair(&keypair);
         let onion_from_pub = parse_public_key_to_onion_host(&pub_ur)
             .expect("should parse public key");
@@ -195,31 +212,49 @@ mod tests {
     fn test_parse_crypto_prvkeys() {
         init();
         let ur = make_ur_crypto_prvkeys();
-        assert!(ur.starts_with("ur:crypto-prvkeys/"), "expected ur:crypto-prvkeys: {ur}");
-        let keypair = parse_private_key(&ur).expect("should parse crypto-prvkeys");
+        assert!(
+            ur.starts_with("ur:crypto-prvkeys/"),
+            "expected ur:crypto-prvkeys: {ur}"
+        );
+        let keypair =
+            parse_private_key(&ur).expect("should parse crypto-prvkeys");
         let onion = onion_host_from_keypair(&keypair);
         assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
-        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
+        assert_eq!(
+            onion.len(),
+            62,
+            "expected 56 base32 chars + '.onion': {onion}"
+        );
     }
 
     #[test]
     fn test_parse_crypto_pubkeys_to_onion_host() {
         init();
         let ur = make_ur_crypto_pubkeys();
-        assert!(ur.starts_with("ur:crypto-pubkeys/"), "expected ur:crypto-pubkeys: {ur}");
-        let onion = parse_public_key_to_onion_host(&ur).expect("should parse crypto-pubkeys");
+        assert!(
+            ur.starts_with("ur:crypto-pubkeys/"),
+            "expected ur:crypto-pubkeys: {ur}"
+        );
+        let onion = parse_public_key_to_onion_host(&ur)
+            .expect("should parse crypto-pubkeys");
         assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
-        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
+        assert_eq!(
+            onion.len(),
+            62,
+            "expected 56 base32 chars + '.onion': {onion}"
+        );
     }
 
     #[test]
     fn test_crypto_keys_match_signing_keys() {
         init();
-        // Both UR formats for the same Ed25519 seed must produce the same onion address.
+        // Both UR formats for the same Ed25519 seed must produce the same onion
+        // address.
         let signing_priv_ur = make_ur_signing_private_key();
         let crypto_priv_ur = make_ur_crypto_prvkeys();
 
-        let kp1 = parse_private_key(&signing_priv_ur).expect("signing-private-key");
+        let kp1 =
+            parse_private_key(&signing_priv_ur).expect("signing-private-key");
         let kp2 = parse_private_key(&crypto_priv_ur).expect("crypto-prvkeys");
 
         assert_eq!(
@@ -255,7 +290,10 @@ mod tests {
 
         // Cross-check: the direct HsId display must match
         let expected_onion = hs_id.display_unredacted().to_string();
-        assert_eq!(onion, expected_onion, "round-trip onion address must match");
+        assert_eq!(
+            onion, expected_onion,
+            "round-trip onion address must match"
+        );
     }
 
     // --- generate_keypair ---
@@ -263,7 +301,8 @@ mod tests {
     #[test]
     fn test_generate_keypair() {
         init();
-        let (priv_ur, pub_ur) = generate_keypair().expect("should generate keypair");
+        let (priv_ur, pub_ur) =
+            generate_keypair().expect("should generate keypair");
         assert!(
             priv_ur.starts_with("ur:signing-private-key/"),
             "expected ur:signing-private-key prefix: {priv_ur}"
@@ -273,12 +312,17 @@ mod tests {
             "expected ur:signing-public-key prefix: {pub_ur}"
         );
         // Round-trip: private key should parse successfully
-        let _keypair = parse_private_key(&priv_ur).expect("should parse generated private key");
+        let _keypair = parse_private_key(&priv_ur)
+            .expect("should parse generated private key");
         // Round-trip: public key should produce a valid .onion address
         let onion = parse_public_key_to_onion_host(&pub_ur)
             .expect("should parse generated public key");
         assert!(onion.ends_with(".onion"), "expected .onion suffix: {onion}");
-        assert_eq!(onion.len(), 62, "expected 56 base32 chars + '.onion': {onion}");
+        assert_eq!(
+            onion.len(),
+            62,
+            "expected 56 base32 chars + '.onion': {onion}"
+        );
     }
 
     // --- Error cases ---
@@ -301,6 +345,9 @@ mod tests {
         // Pass a public key UR where a private key is expected
         let pub_ur = make_ur_signing_public_key();
         let result = parse_private_key(&pub_ur);
-        assert!(result.is_err(), "should reject a public key UR as private key");
+        assert!(
+            result.is_err(),
+            "should reject a public key UR as private key"
+        );
     }
 }
