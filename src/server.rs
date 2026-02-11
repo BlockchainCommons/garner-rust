@@ -251,14 +251,25 @@ async fn handle_stream_request(
 /// Map a request path to a file under `docroot`.  For `/`, try
 /// `index.html` first then fall back to `index.txt`.
 fn resolve_file(request_path: &str, docroot: &Path) -> Option<PathBuf> {
-    match request_path {
-        "/" => ["index.html", "index.txt"]
+    if request_path == "/" {
+        return ["index.html", "index.txt"]
             .iter()
             .map(|name| docroot.join(name))
-            .find(|p| p.is_file()),
-        "/index.html" => Some(docroot.join("index.html")),
-        "/index.txt" => Some(docroot.join("index.txt")),
-        _ => None,
+            .find(|p| p.is_file());
+    }
+
+    let relative = request_path.strip_prefix('/')?;
+    let candidate = docroot.join(relative);
+
+    // Prevent path traversal (e.g. "/../secret")
+    if !candidate.starts_with(docroot) {
+        return None;
+    }
+
+    if candidate.is_file() {
+        Some(candidate)
+    } else {
+        None
     }
 }
 
