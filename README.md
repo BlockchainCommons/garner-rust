@@ -1,4 +1,12 @@
-# Garner
+# Blockchain Commons Garner for Rust
+
+<!--Guidelines: https://github.com/BlockchainCommons/secure-template/wiki -->
+
+### _by Wolf McNally and Blockchain Commons_
+
+---
+
+## Introduction
 
 A Tor onion service that serves static files over HTTP, built with [Arti](https://gitlab.torproject.org/tpo/core/arti).
 
@@ -170,3 +178,45 @@ Fetch one or more documents from a `.onion` address over Tor.
 | `<URL>...`         | Full `.onion` URL(s), or path(s) when `--key` or `--address` is set.                          |
 | `--key <UR>`       | Ed25519 public key in UR format to derive the `.onion` host. Also reads `GARNER_KEY` env var. |
 | `--address <ADDR>` | `.onion` address to connect to directly. Also reads `GARNER_ADDRESS` env var.                 |
+
+## Status - Community Review
+
+Garner is currently in community review. We appreciate your testing and feedback. Comments can be posted [to the Gordian Developer Community](https://github.com/BlockchainCommons/Gordian-Developer-Community/discussions).
+
+Because this tool is still in community review, it should not be used for production tasks until it has received further testing and auditing.
+
+See [Blockchain Commons' Development Phases](https://github.com/BlockchainCommons/Community/blob/master/release-path.md).
+
+## Contributing
+
+We encourage public contributions through issues and pull requests! Please review [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our development process. All contributions to this repository require a GPG signed [Contributor License Agreement](./CLA.md).
+
+## Financial Support
+
+Garner is a project of [Blockchain Commons](https://www.blockchaincommons.com/), a "not-for-profit" social benefit corporation committed to open source & open development. Our work is funded entirely by donations and collaborative partnerships with people like you. Every contribution will be spent on building open tools, technologies, and techniques that sustain and advance blockchain and internet security infrastructure and promote an open web.
+
+To financially support further development of Garner and other projects, please consider becoming a Patron of Blockchain Commons through ongoing monthly patronage as a [GitHub Sponsor](https://github.com/sponsors/BlockchainCommons). You can also support Blockchain Commons with bitcoins at our [BTCPay Server](https://btcpay.blockchaincommons.com/).
+
+## Discussions
+
+The best place to talk about Blockchain Commons and its projects is in our GitHub Discussions areas:
+
+- [Gordian Developer Community](https://github.com/BlockchainCommons/Gordian-Developer-Community/discussions): For developers working with Gordian specifications
+- [Blockchain Commons Discussions](https://github.com/BlockchainCommons/Community/discussions): For general Blockchain Commons topics
+
+## Credits
+
+The following people directly contributed to this repository:
+
+| Name              | Role                | Github                                           | Email                               | GPG Fingerprint                                   |
+| ----------------- | ------------------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------- |
+| Christopher Allen | Principal Architect | [@ChristopherA](https://github.com/ChristopherA) | <ChristopherA@LifeWithAlacrity.com> | FDFE 14A5 4ECB 30FC 5D22 74EF F8D3 6C91 3574 05ED |
+| Wolf McNally      | Contributor         | [@WolfMcNally](https://github.com/wolfmcnally)   | <Wolf@WolfMcNally.com>              | 9436 52EE 3844 1760 C3DC 3536 4B6C 2FCF 8947 80AE |
+
+## Responsible Disclosure
+
+We want to keep all our software safe for everyone. If you have discovered a security vulnerability, we appreciate your help in disclosing it to us in a responsible manner. Please see our [security policy](SECURITY.md) for details.
+
+## License
+
+Garner is licensed under the BSD-2-Clause-Patent license. See [LICENSE](./LICENSE.md) for details.
