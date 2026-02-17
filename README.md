@@ -8,7 +8,27 @@
 
 ## Introduction
 
-A Tor onion service that serves static files over HTTP, built with [Arti](https://gitlab.torproject.org/tpo/core/arti).
+Garner is a Tor-native endpoint for self-sovereign identity: a minimal service for retrieving authenticated identity documents that runs as an onion service.
+
+It leverages [Arti](https://gitlab.torproject.org/tpo/core/arti/) (the Tor Project's official Rust implementation), so neither the server operator nor the client needs to install a Tor daemon, a Tor Browser, or any external Tor software. Just `cargo install garner-rust`.
+
+The name reflects the verb **to garner**: _to gather, collect, and store something of value over time_. The server accumulates identity artifacts — keys, credentials, attestations, endorsements, and revocation state — and serves them in elided or encrypted form. The `garner get` client subcommand connects to a garner service over Tor, fetches documents, and writes them to stdout for piping into other tools. Because `garner get` accepts a public key to derive the `.onion` address, a client needs only the public key — not an onion URL — to retrieve identity-related documents.
+
+It is not a general-purpose web server. It belongs to the family of simple, purpose-built endpoints such as [finger](https://datatracker.ietf.org/doc/html/rfc1288) and [WebFinger](https://datatracker.ietf.org/doc/html/rfc7033), trading the complexity and attack surface of HTTP for a minimal protocol focused exclusively on identity document retrieval over Tor.
+
+Tor onion services derive the `.onion` address directly from the service's Ed25519 public key, making it a self-certifying identifier — anyone who knows the public key can locate the service, and the connection itself proves the operator controls the corresponding private key. No certificate authority, DNS, or external discovery mechanism is needed. These properties make Tor a natural transport for signed documents.
+
+Garner can serve any signed identity document — W3C DID documents, VC Controller documents, [Gordian Envelopes](https://developer.blockchaincommons.com/envelope/), and other decentralized identity artifacts that benefit from a privacy-preserving endpoint.
+
+Its primary use case is to serve Gordian Envelopes, which support radical data minimization through elision (selective redaction or encryption) without invalidating signatures. Garner can offer different subsets of the same authenticated document to different parties — the subject of the credential, not the issuer, controls which identity attributes are revealed.
+
+In particular, garner is designed to serve multiple editions of an [eXtensible IDentifier (XID)](https://developer.blockchaincommons.com/xid/), linked by [Provenance Marks](https://developer.blockchaincommons.com/provemark/) that cryptographically order each edition from the original genesis record, and to support [Gordian Clubs](https://developer.blockchaincommons.com/clubs/) for group coordination.
+
+Because the onion address encodes the service's public key, receiving a document from a garner service proves more than authenticity — it proves the operator has **live control** of the signing key at the moment of the response. A static signature on a key server could have been created at any time, including after a compromise; a garner response can only come from someone operating the private key right now, defending against stale-signature and post-compromise replay. (Other layers in the [Gordian Stack](https://developer.blockchaincommons.com/) address key-separation and rotation.)
+
+Garner is part of the [Blockchain Commons Gordian](https://developer.blockchaincommons.com/) ecosystem. In its current form (v0.1.0), it serves files from a document root directory over Tor, with support for both ephemeral and deterministic `.onion` addresses via [UR](https://developer.blockchaincommons.com/ur/)-encoded Ed25519 keys.
+
+Future versions will add structured envelope queries, explicit Provenance Mark chains for XID edition histories, and more granular disclosure controls built on envelope elision.
 
 ## Installing
 
