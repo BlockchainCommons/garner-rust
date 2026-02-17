@@ -33,8 +33,7 @@ Future versions will add structured envelope queries, explicit Provenance Mark c
 ## Installing
 
 ```bash
-cd garner
-cargo install --path .
+cargo install garner
 
 garner --help
 ```
